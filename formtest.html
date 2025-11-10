@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тренажер Формул</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+    
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)']],
+                displayMath: [['\\[', '\\]']]
+            },
+            svg: {
+                fontCache: 'global'
+            },
+            startup: {
+                ready: () => {
+                    MathJax.startup.defaultReady();
+                    // Вызываем нашу главную функцию, когда MathJax готов
+                    myAppInit().catch(err => console.error("Ошибка при инициализации приложения:", err));
+                }
+            }
+        };
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            /* ИЗМЕНЕНИЕ: height и overflow удалены, т.к. задаются классами Tailwind */
+        }
+        
+        .option-button {
+            width: 100%;
+            padding: 0.65rem; /* p-2.5 */
+            background-color: #3b82f6; /* bg-blue-500 */
+            color: white;
+            font-size: 0.875rem; /* text-sm */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow */
+            transition: all 0.15s ease-in-out;
+            border-width: 2px;
+            border-color: #2563eb; /* border-blue-600 */
+            min-height: 3.5rem; /* 56px */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.4;
+        }
+        .option-button:hover {
+            background-color: #2563eb; /* hover:bg-blue-600 */
+        }
+        .option-button:focus {
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 2px #60a5fa; /* focus:ring-2 focus:ring-blue-400 */
+        }
+        .option-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        
+        /* Классы для обратной связи */
+        .correct {
+            background-color: #22c55e !important; /* bg-green-500 */
+            border-color: #16a34a !important; /* border-green-600 */
+        }
+        .incorrect {
+            background-color: #ef4444 !important; /* bg-red-500 */
+            border-color: #dc2626 !important; /* border-red-600 */
+        }
+        
+        .math-block {
+            font-size: 1.1em; 
+        }
+
+        /* --- Анимации --- */
+        
+        /* Появление карточки */
+        @keyframes fadeInScaleUp {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        .anim-fade-in-scale-up {
+            animation: fadeInScaleUp 0.3s ease-out forwards;
+        }
+
+        /* Анимация "pop" для фидбека */
+        @keyframes popIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            70% {
+                opacity: 1;
+                transform: scale(1.05);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        .anim-pop-in {
+            animation: popIn 0.3s ease-out forwards;
+        }
+
+        /* Плавное исчезновение */
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+        }
+        .anim-fade-out {
+            animation: fadeOut 0.25s ease-out forwards;
+        }
+
+    </style>
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden flex items-center justify-center p-2 sm:p-4">
+
+    <div id="main-card" class="bg-white p-4 sm:p-6 rounded-xl shadow-lg w-full max-w-2xl flex flex-col h-full anim-fade-in-scale-up">
+        
+        <div>
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-3">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">Тест ФСУ</h1>
+                <div class="text-left sm:text-right mt-2 sm:mt-0">
+                    <span id="question-counter" class="block sm:inline text-base sm:text-lg font-medium text-gray-600">Вопрос 1 / 30</span>
+                    <span id="score-counter" class="block sm:inline text-base sm:text-lg font-medium text-gray-600 mt-1 sm:mt-0 sm:ml-4">Счет: 0</span>
+                </div>
+            </div>
+
+            <div class="my-3 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center min-h-[5rem] flex items-center justify-center">
+                <span id="problem-text" class="text-xl sm:text-2xl math-block" style="opacity: 0; transform: translateY(15px);">
+                    Загрузка...
+                </span>
+            </div>
+        </div>
+
+        
+        <div id="results-screen" class="hidden text-center flex-grow flex flex-col justify-center items-center" style="opacity: 0;">
+            <h2 id="results-title" class="text-3xl font-bold text-gray-800 mb-4">Тест Завершен!</h2>
+            <p id="final-score" class="text-2xl text-gray-700 mb-2">Ваш результат: 0 / 30 (0%)</p>
+            <p id="results-message" class="text-lg text-gray-600 mb-6">Поздравляем!</p>
+            
+            <div id="stats-block" class="mb-6 p-4 bg-gray-100 rounded-lg">
+                <h4 class="font-semibold text-lg text-gray-700 mb-2">Общая статистика</h4>
+                <p id="total-attempts" class="text-gray-600">Всего попыток: 0</p>
+                <p id="success-rate" class="text-gray-600">Успешность: 0%</p>
+            </div>
+
+            <button id="restart-btn" class="w-full max-w-sm px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-opacity-75 transition duration-150 ease-in-out">
+                Начать заново
+            </button>
+        </div>
+
+
+        <div id="quiz-container" class="math-block flex flex-col flex-grow min-h-0">
+            
+            <div class="mb-3">
+                <button id="hint-btn" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-150 hidden">
+                    Нужна подсказка?
+                </button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto min-h-0">
+                
+                <div id="hint-display-container" class="border border-blue-200 bg-blue-50/70 rounded-lg mb-3" 
+                     style="max-height: 0; overflow: hidden; transition: all 0.35s ease-out; opacity: 0; padding-top: 0; padding-bottom: 0;">
+                    
+                    <div class="p-3 text-sm">
+                        <h4 class="font-semibold text-lg mb-2 text-gray-700">Основные формулы:</h4>
+                        <div id="hint-general" class="mb-4">
+                            </div>
+                        
+                        <div id="hint-specific-container" style="max-height: 0; overflow: hidden; transition: all 0.35s ease-out; opacity: 0;">
+                            <h4 class="font-semibold text-lg mb-2 text-gray-700">Таргетная подсказка:</h4>
+                            <div id="hint-specific" class="text-blue-800">
+                                </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div id="timer-container" class="w-full bg-gray-200 rounded-full h-2.5 mb-3 hidden" style="opacity: 0;">
+                    <div id="timer-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 100%; transition: width 0.5s linear;"></div>
+                </div>
+
+                <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-3 hidden">
+                    </div>
+            </div>
+
+            <div class="mt-auto pt-3"> <div id="feedback" class="text-center text-lg font-medium h-7 mb-3 text-transparent">
+                    &nbsp; </div>
+                
+                <div class="relative h-12"> <button id="show-options-btn" class="absolute inset-0 w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out" style="opacity: 0; transform: translateY(10px);">
+                        Показать варианты ответа
+                    </button>
+
+                    <button id="next-question-btn" class="absolute inset-0 w-full px-6 py-3 bg-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out hidden" style="opacity: 0; transform: translateY(10px);">
+                        Следующий пример
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Оборачиваем ВЕСЬ код в функцию, которую вызовет MathJax
+        async function myAppInit() {
+            
+            // --- Получаем элементы DOM ---
+            const mainCard = document.getElementById('main-card');
+            const problemText = document.getElementById('problem-text');
+            const optionsContainer = document.getElementById('options-container');
+            const feedback = document.getElementById('feedback');
+            const questionCounter = document.getElementById('question-counter');
+            const scoreCounter = document.getElementById('score-counter');
+            
+            const resultsScreen = document.getElementById('results-screen');
+            const resultsTitle = document.getElementById('results-title');
+            const finalScore = document.getElementById('final-score');
+            const resultsMessage = document.getElementById('results-message');
+            const restartBtn = document.getElementById('restart-btn');
+            const quizContainer = document.getElementById('quiz-container');
+            
+            const totalAttemptsEl = document.getElementById('total-attempts');
+            const successRateEl = document.getElementById('success-rate');
+            
+            const showOptionsBtn = document.getElementById('show-options-btn');
+            const nextQuestionBtn = document.getElementById('next-question-btn');
+            const timerContainer = document.getElementById('timer-container');
+            const timerBar = document.getElementById('timer-bar');
+
+            const hintBtn = document.getElementById('hint-btn');
+            const hintDisplayContainer = document.getElementById('hint-display-container');
+            const hintGeneral = document.getElementById('hint-general');
+            const hintSpecific = document.getElementById('hint-specific');
+            const hintSpecificContainer = document.getElementById('hint-specific-container');
+
+            // --- Переменные состояния ---
+            let currentProblem = {};
+            let isRendering = false; // "Замок"
+            let questionNumber = 1;
+            let score = 0;
+            const totalQuestions = 30;
+            const passThreshold = 0.9; // 90%
+            
+            let timerInterval = null;
+            let timerValue = 15; // 15 секунд
+            let hintState = 0; // 0 = Скрыто, 1 = Общая, 2 = Таргетная
+
+            const formulas = [
+                '\\((a + b)^2 = a^2 + 2ab + b^2\\)',
+                '\\((a - b)^2 = a^2 - 2ab + b^2\\)',
+                '\\(a^2 - b^2 = (a - b)(a + b)\\)'
+            ];
+
+            // --- Хелпер Анимаций ---
+            function animateElement(el, animationClass, duration = 300, onEnd = null) {
+                if (!el) return;
+                
+                // Для плавного появления
+                if (animationClass === 'fadeIn') {
+                    el.style.opacity = '0';
+                    el.style.transform = 'translateY(15px)';
+                    el.style.transition = `all ${duration / 1000}s ease-out`;
+                    
+                    setTimeout(() => {
+                        el.classList.remove('hidden');
+                        setTimeout(() => {
+                            el.style.opacity = '1';
+                            el.style.transform = 'translateY(0)';
+                            if (onEnd) setTimeout(onEnd, duration);
+                        }, 10); // 10ms для старта
+                    }, 0);
+                } 
+                // Для плавного исчезновения
+                else if (animationClass === 'fadeOut') {
+                    el.style.opacity = '0';
+                    el.style.transform = 'translateY(15px)';
+                    el.style.transition = `all ${duration / 1000}s ease-in`;
+                    
+                    setTimeout(() => {
+                        el.classList.add('hidden');
+                        if (onEnd) onEnd();
+                    }, duration);
+                }
+                // Для "Pop In"
+                else if (animationClass === 'popIn') {
+                    el.classList.remove('hidden');
+                    el.classList.remove('text-transparent');
+                    el.style.animation = 'none'; // Сброс
+                    el.offsetHeight; // "Фокус" для рестарта анимации
+                    el.style.animation = `popIn ${duration / 1000}s ease-out forwards`;
+                    if (onEnd) setTimeout(onEnd, duration);
+                }
+            }
+
+
+            // --- Вспомогательные функции ---
+
+            function getRandomInt(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function getRandomVar() {
+                const vars = ['x', 'y', 'a', 'b', 'm', 'n'];
+                return vars[Math.floor(Math.random() * vars.length)];
+            }
+
+            function getRandomRootNum() {
+                const roots = [2, 3, 5, 7, 10, 11, 13];
+                return roots[Math.floor(Math.random() * roots.length)];
+            }
+            
+            function gcd(a, b) {
+                a = Math.abs(a);
+                b = Math.abs(b);
+                while (b) {
+                    [a, b] = [b, a % b];
+                }
+                return a;
+            }
+            
+            // Обертка для LaTeX
+            const m = (s) => `\\(${s}\\)`;
+
+            // --- Функции-генераторы (возвращают объект с компонентами) ---
+
+            // ГЕНЕРАТОР 1: (Переменная + Число) - Простые
+            function generateVarNumProblem() {
+                const a = getRandomInt(2, 7);
+                const b = getRandomInt(3, 9);
+                const v1 = getRandomVar();
+
+                const types = ['sumSquare', 'diffSquare', 'squaresDiffExpand', 'squaresDiffFactor'];
+                const type = types[Math.floor(Math.random() * types.length)];
+                
+                return buildProblem(type, {
+                    a: a, b: b, vA: v1, vB: null,
+                    typeA: 'var', typeB: 'num'
+                });
+            }
+            
+            // ГЕНЕРАТОР 2: (Переменная + Переменная) - Тоже Простые
+            function generateVarVarProblem() {
+                const a = getRandomInt(2, 6);
+                const b = getRandomInt(2, 6);
+                const v1 = getRandomVar();
+                let v2;
+                do { v2 = getRandomVar(); } while (v1 === v2); 
+
+                const types = ['sumSquare', 'diffSquare', 'squaresDiffExpand', 'squaresDiffFactor'];
+                const type = types[Math.floor(Math.random() * types.length)];
+                
+                return buildProblem(type, {
+                    a: a, b: b, vA: v1, vB: v2, 
+                    typeA: 'var', typeB: 'var'
+                });
+            }
+
+            // ГЕНЕРАТОР 3: (Дробь-Переменная + [Число/Переменная])
+            function generateFractionProblem() {
+                const numA = getRandomInt(1, 5);
+                let denA = getRandomInt(2, 6); 
+                const commonA = gcd(numA, denA);
+                const sNumA = numA / commonA;
+                const sDenA = denA / commonA;
+
+                const v1 = getRandomVar();
+                
+                const isB_Var = Math.random() > 0.5;
+                const numB = getRandomInt(1, 7);
+                
+                let v2, typeB;
+
+                if (isB_Var) {
+                    do { v2 = getRandomVar(); } while (v1 === v2);
+                    typeB = 'var';
+                } else {
+                    v2 = null;
+                    typeB = 'num';
+                }
+
+                const types = ['sumSquare', 'diffSquare', 'squaresDiffExpand', 'squaresDiffFactor'];
+                const type = types[Math.floor(Math.random() * types.length)];
+                
+                return buildProblem(type, {
+                    a: sNumA, denA: sDenA, vA: v1, 
+                    b: numB, vB: v2,
+                    typeA: 'fracVar', typeB: typeB
+                });
+            }
+
+            // ГЕНЕРАТОР 4: (Корень + Корень - Числа)
+            function generateRootNumProblem() {
+                const a_coef = getRandomInt(1, 5);
+                const b_coef = getRandomInt(1, 5);
+                const a_root = getRandomRootNum();
+                let b_root;
+                do { b_root = getRandomRootNum(); } while (a_root === b_root); 
+
+                const types = ['sumSquare', 'diffSquare', 'squaresDiffExpand'];
+                const type = types[Math.floor(Math.random() * types.length)];
+                
+                return buildProblem(type, {
+                    a: a_coef, b: b_coef, rA: a_root, rB: b_root,
+                    typeA: 'rootNum', typeB: 'rootNum'
+                });
+            }
+            
+            // ГЕНЕРАТОР 5: (Корень + Корень - Переменные)
+            function generateRootVarProblem() {
+                const a_coef = getRandomInt(1, 5);
+                const b_coef = getRandomInt(1, 5);
+                const v1 = getRandomVar();
+                let v2;
+                do { v2 = getRandomVar(); } while (v1 === v2);
+
+                const types = ['sumSquare', 'diffSquare', 'squaresDiffExpand', 'squaresDiffFactor'];
+                const type = types[Math.floor(Math.random() * types.length)];
+                
+                return buildProblem(type, {
+                    a: a_coef, b: b_coef, vA: v1, vB: v2,
+                    typeA: 'rootVar', typeB: 'rootVar'
+                });
+            }
+            
+            // --- ФУНКЦИЯ СБОРКИ ---
+            
+            function buildTerm(p) { // p = {coef, den, root, v, type}
+                if (p.type === 'var') {
+                    return p.coef === 1 ? p.v : `${p.coef}${p.v}`;
+                }
+                if (p.type === 'num') {
+                    return `${p.coef}`;
+                }
+                if (p.type === 'rootNum') {
+                    return p.coef === 1 ? `\\sqrt{${p.root}}` : `${p.coef}\\sqrt{${p.root}}`;
+                }
+                if (p.type === 'rootVar') {
+                    return p.coef === 1 ? `\\sqrt{${p.v}}` : `${p.coef}\\sqrt{${p.v}}`;
+                }
+                if (p.type === 'fracVar') {
+                    return p.den === 1 ? `${p.coef}${p.v}` : `\\frac{${p.coef}}{${p.den}}${p.v}`;
+                }
+                return '';
+            }
+
+            function buildTermSq(p) {
+                if (p.type === 'var') {
+                    return p.coef * p.coef === 1 ? `${p.v}^2` : `${p.coef * p.coef}${p.v}^2`;
+                }
+                if (p.type === 'num') {
+                    return `${p.coef * p.coef}`;
+                }
+                if (p.type === 'rootNum') {
+                    return `${p.coef * p.coef * p.root}`; // <-- Вычисление
+                }
+                if (p.type === 'rootVar') {
+                    return `${p.coef * p.coef}${p.v}`; // <-- Вычисление
+                }
+                if (p.type === 'fracVar') {
+                    return p.den === 1 ? `${p.coef * p.coef}${p.v}^2` : `\\frac{${p.coef * p.coef}}{${p.den * p.den}}${p.v}^2`;
+                }
+                return '';
+            }
+            
+            function buildProblem(type, p) {
+                // p = {a, b, vA, vB, rA, rB, denA, denB, typeA, typeB}
+                
+                const termA_params = { coef: p.a, den: p.denA || 1, root: p.rA, v: p.vA, type: p.typeA };
+                const termB_params = { coef: p.b, den: p.denB || 1, root: p.rB, v: p.vB, type: p.typeB };
+
+                const termA = buildTerm(termA_params);
+                const termB = buildTerm(termB_params);
+                
+                const termA_sq = buildTermSq(termA_params);
+                const termB_sq = buildTermSq(termB_params);
+
+                let term2ab, num2ab_val, str2ab_val;
+                
+                const numA = termA_params.coef;
+                const denA = termA_params.den;
+                const numB = termB_params.coef;
+                const denB = termB_params.den;
+
+                num2ab_val = 2 * numA * numB;
+                let den2ab_val = denA * denB;
+                
+                const common_2ab = gcd(num2ab_val, den2ab_val);
+                num2ab_val /= common_2ab;
+                den2ab_val /= common_2ab;
+                
+                let str_parts = [];
+                if (p.typeA === 'rootNum') str_parts.push(`\\sqrt{${p.rA}}`);
+                if (p.typeB === 'rootNum') str_parts.push(`\\sqrt{${p.rB}}`);
+                if (p.typeA === 'rootVar') str_parts.push(`\\sqrt{${p.vA}}`);
+                if (p.typeB === 'rootVar') str_parts.push(`\\sqrt{${p.vB}}`);
+                
+                if (p.typeA === 'var' || p.typeA === 'fracVar') str_parts.push(p.vA);
+                if (p.typeB === 'var' || p.typeB === 'fracVar') str_parts.push(p.vB);
+
+                if ((p.typeA === 'rootNum' && p.typeB === 'rootNum')) {
+                     str_parts = [`\\sqrt{${p.rA * p.rB}}`];
+                } else if (p.typeA === 'rootVar' && p.typeB === 'rootVar') {
+                     str_parts = [`\\sqrt{${p.vA}${p.vB}}`];
+                } else if (p.typeA === 'rootNum' && p.typeB === 'rootVar') {
+                    str_parts = [`\\sqrt{${p.rA}${p.vB}}`];
+                } else if (p.typeA === 'rootVar' && p.typeB === 'rootNum') {
+                    str_parts = [`\\sqrt{${p.vA}${p.rB}}`];
+                }
+                
+                str2ab_val = str_parts.join('');
+                
+                if (num2ab_val === 0) {
+                    term2ab = '0';
+                } else if (den2ab_val === 1) {
+                    term2ab = num2ab_val === 1 && str2ab_val ? str2ab_val : `${num2ab_val}${str2ab_val}`;
+                } else {
+                    term2ab = `\\frac{${num2ab_val}}{${den2ab_val}}${str2ab_val}`;
+                }
+
+                let canSimplify = (p.typeA === 'num' || p.typeA === 'rootNum') && (p.typeB === 'num' || p.typeB === 'rootNum');
+                
+                let question = '';
+                let answer = '';
+                let altAnswer = null;
+                let hint = '';
+                const options = [];
+
+                switch (type) {
+                    case 'sumSquare': // (a + b)²
+                        question = m(`(${termA} + ${termB})^2 =`);
+                        hint = `Примените формулу квадрата суммы: ${formulas[0]}`;
+                        if (canSimplify) {
+                            const numPart = (p.typeA === 'rootNum' ? p.a*p.a*p.rA : p.a*p.a) + (p.typeB === 'rootNum' ? p.b*p.b*p.rB : p.b*p.b);
+                            answer = m(`${numPart} + ${term2ab}`);
+                            options.push(m(`${numPart} - ${term2ab}`)); 
+                            const wrongNum = (p.typeA === 'rootNum' ? p.a*p.rA : p.a) + (p.typeB === 'rootNum' ? p.b*p.rB : p.b);
+                            options.push(m(`${wrongNum} + ${term2ab}`));
+                        } else {
+                            answer = m(`${termA_sq} + ${term2ab} + ${termB_sq}`);
+                            options.push(m(`${termA_sq} - ${term2ab} + ${termB_sq}`)); 
+                            options.push(m(`${termA_sq} + ${termB_sq}`));
+                        }
+                        options.push(m(`${termA_sq} - ${termB_sq}`)); 
+                        break;
+
+                    case 'diffSquare': // (a - b)²
+                        question = m(`(${termA} - ${termB})^2 =`);
+                        hint = `Примените формулу квадрата разности: ${formulas[1]}`;
+                        if (canSimplify) {
+                            const numPart = (p.typeA === 'rootNum' ? p.a*p.a*p.rA : p.a*p.a) + (p.typeB === 'rootNum' ? p.b*p.b*p.rB : p.b*p.b);
+                            answer = m(`${numPart} - ${term2ab}`);
+                            options.push(m(`${numPart} + ${term2ab}`)); 
+                            const wrongNum = (p.typeA === 'rootNum' ? p.a*p.rA : p.a) + (p.typeB === 'rootNum' ? p.b*p.rB : p.b);
+                            options.push(m(`${wrongNum} - ${term2ab}`));
+                        } else {
+                            answer = m(`${termA_sq} - ${term2ab} + ${termB_sq}`);
+                            options.push(m(`${termA_sq} + ${term2ab} + ${termB_sq}`)); 
+                            options.push(m(`${termA_sq} - ${termB_sq}`));
+                        }
+                        options.push(m(`${termA_sq} + ${termB_sq}`)); 
+                        break;
+
+                    case 'squaresDiffExpand': // (a - b)(a + b)
+                        question = m(`(${termA} - ${termB})(${termA} + ${termB}) =`);
+                        hint = `Это формула разности квадратов, но в обратную сторону: ${formulas[2]}`;
+                        if (canSimplify) {
+                            const numPart = (p.typeA === 'rootNum' ? p.a*p.a*p.rA : p.a*p.a) - (p.typeB === 'rootNum' ? p.b*p.b*p.rB : p.b*p.b);
+                            answer = m(`${numPart}`);
+                            options.push(m(`${-numPart}`));
+                            options.push(m(`${numPart} + ${term2ab}`));
+                        } else {
+                            answer = m(`${termA_sq} - ${termB_sq}`);
+                            options.push(m(`${termA_sq} + ${termB_sq}`));
+                            options.push(m(`${termA_sq} - ${term2ab} + ${termB_sq}`));
+                        }
+                        options.push(m(`${termA_sq} + ${term2ab} + ${termB_sq}`));
+                        break;
+
+                    case 'squaresDiffFactor': // a² - b²
+                        question = m(`${termA_sq} - ${termB_sq} =`);
+                        hint = `Примените формулу разности квадратов: ${formulas[2]}. \nНайдите 'a' и 'b' (без квадратов).`;
+                        answer = m(`(${termA} - ${termB})(${termA} + ${termB})`);
+                        altAnswer = m(`(${termA} + ${termB})(${termA} - ${termB})`);
+                        options.push(m(`(${termA} + ${termB})^2`));
+                        options.push(m(`(${termA} - ${termB})^2`));
+                        options.push(m(`${termA_sq} + ${termB_sq}`));
+                        break;
+                }
+                
+                options.push(answer);
+                if (altAnswer) options.push(altAnswer); 
+
+                let finalOptions = shuffleArray([...new Set(options.filter(o => o))]);
+                
+                while (finalOptions.length < 4) {
+                    if (!finalOptions.includes(m(`${termA_sq} + ${termB_sq} + ${term2ab}`))) {
+                         finalOptions.push(m(`${termA_sq} + ${termB_sq} + ${term2ab}`));
+                    } else if (!finalOptions.includes(m(`${termA_sq} - ${termB_sq} - ${term2ab}`))) {
+                         finalOptions.push(m(`${termA_sq} - ${termB_sq} - ${term2ab}`));
+                    } else {
+                         finalOptions.push(m(`${getRandomInt(1,100)}`));
+                    }
+                }
+                
+                finalOptions = shuffleArray(finalOptions.slice(0, 4));
+                
+                if (!finalOptions.includes(answer) && !(altAnswer && finalOptions.includes(altAnswer))) {
+                    finalOptions[0] = answer; // Заменяем первый случайный
+                    finalOptions = shuffleArray(finalOptions);
+                }
+                
+                return {
+                    question: question,
+                    answer: answer,
+                    altAnswer: altAnswer,
+                    options: finalOptions,
+                    hint: hint
+                };
+            }
+
+
+            // --- Логика UI ---
+            
+            function generateProblem() {
+                try {
+                    // Секция 1: Простые (Вопросы 1-10)
+                    if (questionNumber <= 10) {
+                        const generators = [generateVarVarProblem, generateVarNumProblem];
+                        return generators[Math.floor(Math.random() * generators.length)]();
+                    }
+                    // Секция 2: Дроби (Вопросы 11-20)
+                    else if (questionNumber <= 20) {
+                        return generateFractionProblem();
+                    }
+                    // Секция 3: Корни (Вопросы 21-30)
+                    else {
+                        const generators = [generateRootNumProblem, generateRootVarProblem];
+                         return generators[Math.floor(Math.random() * generators.length)]();
+                    }
+                    
+                } catch (error) {
+                    console.error("Ошибка при генерации задания:", error);
+                    return generateVarNumProblem(); // Запасной вариант
+                }
+            }
+
+            async function displayProblem() {
+                if (isRendering) return; 
+                isRendering = true;
+
+                if (questionNumber > totalQuestions) {
+                    showResults();
+                    isRendering = false;
+                    return;
+                }
+                
+                currentProblem = generateProblem();
+                
+                problemText.textContent = currentProblem.question;
+                
+                // Сбрасываем feedback
+                feedback.textContent = '\u00A0'; // Неразрывный пробел
+                feedback.className = "text-center text-lg font-medium h-7 mb-3 text-transparent";
+                
+                // Очищаем и скрываем старые элементы
+                optionsContainer.innerHTML = ''; 
+                optionsContainer.classList.add('hidden');
+                
+                // *** ИСПРАВЛЕНИЕ БАГА (от 16.11) ***
+                // Принудительно сбрасываем стили, которые могли остаться от
+                // анимации 'fadeOut', иначе на 2-м вопросе вариантов не будет видно.
+                optionsContainer.style.opacity = '';
+                optionsContainer.style.transform = '';
+                optionsContainer.style.transition = '';
+                // *** КОНЕЦ ИСПРАВЛЕНИЯ ***
+                
+                timerContainer.classList.add('hidden');
+                timerContainer.style.opacity = '0';
+                timerBar.style.width = '100%';
+                
+                // Скрываем кнопки
+                nextQuestionBtn.classList.add('hidden');
+                nextQuestionBtn.style.opacity = '0';
+                
+                showOptionsBtn.classList.add('hidden'); // Сначала скрыть
+                hintBtn.classList.add('hidden'); // Сначала скрыть
+                
+                // Сбрасываем подсказки
+                hintState = 0;
+                hintBtn.textContent = 'Нужна подсказка?';
+                hintDisplayContainer.style.maxHeight = '0';
+                hintDisplayContainer.style.opacity = '0';
+                hintDisplayContainer.style.paddingTop = '0';
+                hintDisplayContainer.style.paddingBottom = '0';
+                hintSpecificContainer.style.maxHeight = '0';
+                hintSpecificContainer.style.opacity = '0';
+                
+                // Обновляем счетчики
+                questionCounter.textContent = `Вопрос ${questionNumber} / ${totalQuestions}`;
+                scoreCounter.textContent = `Счет: ${score}`;
+
+                // Заполняем подсказки
+                hintGeneral.innerHTML = formulas.map(f => `<li>${f}</li>`).join('');
+                hintSpecific.textContent = currentProblem.hint;
+
+                try {
+                    // Рендерим ВСЕ (вопрос и подсказки)
+                    await MathJax.typesetPromise([problemText, hintGeneral, hintSpecific]);
+                } catch(e) {
+                    console.error("Ошибка MathJax при рендеринге:", e);
+                    problemText.textContent = "Ошибка рендеринга. Попробуйте 'Следующий пример'.";
+                } 
+                
+                // Плавное появление вопроса
+                animateElement(problemText, 'fadeIn', 300);
+                
+                // Плавное появление кнопок (после вопроса)
+                setTimeout(() => {
+                    animateElement(showOptionsBtn, 'fadeIn', 300);
+                    animateElement(hintBtn, 'fadeIn', 300);
+                }, 150);
+
+                isRendering = false; 
+            }
+            
+            async function startTimer() {
+                if (isRendering) return;
+                isRendering = true;
+
+                // Скрываем кнопку "Нужна подсказка?" и принудительно (без анимации) закрываем подсказку
+                animateElement(hintBtn, 'fadeOut', 200, () => hintBtn.classList.add('hidden'));
+
+                // *** ИСПРАВЛЕНИЕ ГЛИТЧА: ***
+                // Мгновенно скрываем подсказку (отключая анимацию), чтобы избежать "гонки"
+                // и появления скроллбара на долю секунды.
+                hintDisplayContainer.style.transition = 'none';
+                hintSpecificContainer.style.transition = 'none';
+                
+                hintState = 0;
+                hintBtn.textContent = 'Нужна подсказка?';
+                hintDisplayContainer.style.maxHeight = '0';
+                hintDisplayContainer.style.opacity = '0';
+                hintDisplayContainer.style.paddingTop = '0';
+                hintDisplayContainer.style.paddingBottom = '0';
+                hintSpecificContainer.style.maxHeight = '0';
+                hintSpecificContainer.style.opacity = '0';
+                
+                // Сразу же "чиним" анимацию, чтобы она работала в следующий раз
+                setTimeout(() => {
+                    hintDisplayContainer.style.transition = 'all 0.35s ease-out';
+                    hintSpecificContainer.style.transition = 'all 0.35s ease-out';
+                }, 10);
+                
+                showOptionsBtn.classList.add('hidden');
+                
+                // Создаем кнопки
+                currentProblem.options.forEach((optionText, index) => {
+                    const button = document.createElement('button');
+                    button.textContent = optionText;
+                    button.dataset.latex = optionText;
+                    button.className = "option-button";
+                    
+                    // Стили для анимации появления
+                    button.style.opacity = '0';
+                    button.style.transform = 'translateY(15px)';
+                    button.style.transition = 'all 0.3s ease-out';
+                    
+                    button.addEventListener('click', selectAnswer);
+                    optionsContainer.appendChild(button);
+                });
+                
+                optionsContainer.classList.remove('hidden');
+                
+                try {
+                    // Рендерим варианты
+                    await MathJax.typesetPromise([optionsContainer]);
+                } catch(e) {
+                    console.error("Ошибка MathJax при рендеринге вариантов:", e);
+                    feedback.textContent = "Ошибка рендеринга вариантов.";
+                    feedback.className = "text-center text-lg font-medium h-7 mb-3 text-red-600";
+                }
+                
+                // Плавное появление таймера и кнопок
+                animateElement(timerContainer, 'fadeIn', 300);
+                
+                Array.from(optionsContainer.children).forEach((button, index) => {
+                    setTimeout(() => {
+                        button.style.opacity = '1';
+                        button.style.transform = 'translateY(0)';
+                    }, index * 60); // Задержка 60ms
+                });
+
+                
+                // Запускаем таймер
+                timerValue = 15;
+                timerBar.style.transition = 'width 0.5s linear';
+                timerBar.style.width = '100%';
+                
+                clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    timerValue--;
+                    timerBar.style.width = `${(timerValue / 15) * 100}%`;
+                    
+                    if (timerValue <= 0) {
+                        clearInterval(timerInterval);
+                        timeOut();
+                    }
+                }, 1000);
+                
+                isRendering = false;
+            }
+
+            function toggleHint() {
+                hintState = (hintState + 1) % 3; // 0 -> 1 -> 2 -> 0
+
+                switch(hintState) {
+                    case 0: // Скрыть все
+                        hintBtn.textContent = 'Нужна подсказка?';
+                        hintDisplayContainer.style.maxHeight = '0';
+                        hintDisplayContainer.style.opacity = '0';
+                        hintDisplayContainer.style.paddingTop = '0';
+                        hintDisplayContainer.style.paddingBottom = '0';
+                        hintSpecificContainer.style.maxHeight = '0';
+                        hintSpecificContainer.style.opacity = '0';
+                        break;
+                    case 1: // Показать общую
+                        hintBtn.textContent = 'Показать таргетную подсказку';
+                        hintDisplayContainer.style.maxHeight = '500px'; // Достаточно большое значение
+                        hintDisplayContainer.style.opacity = '1';
+                        hintDisplayContainer.style.paddingTop = ''; // Возвращаем к p-3
+                        hintDisplayContainer.style.paddingBottom = ''; // Возвращаем к p-3
+                        break;
+                    case 2: // Показать таргетную
+                        hintBtn.textContent = 'Скрыть подсказки';
+                        hintSpecificContainer.style.maxHeight = '200px'; // Достаточно большое
+                        hintSpecificContainer.style.opacity = '1';
+                        break;
+                }
+            }
+            
+            function timeOut() {
+                // Анимация "pop"
+                animateElement(feedback, 'popIn', 300);
+                feedback.textContent = 'Время вышло!';
+                feedback.className = "text-center text-lg font-medium h-7 mb-3 text-red-600";
+                
+                Array.from(optionsContainer.children).forEach(button => {
+                    button.disabled = true;
+                    if (button.dataset.latex === currentProblem.answer || (currentProblem.altAnswer && button.dataset.latex === currentProblem.altAnswer)) {
+                        button.classList.add('correct');
+                    }
+                });
+                
+                animateElement(nextQuestionBtn, 'fadeIn', 300);
+            }
+            
+            function showResults() {
+                // Плавное исчезновение quizContainer
+                quizContainer.style.transition = 'opacity 0.3s ease-out';
+                quizContainer.style.opacity = '0';
+                
+                setTimeout(() => {
+                    quizContainer.classList.add('hidden');
+                    
+                    // Плавное появление resultsScreen
+                    resultsScreen.classList.remove('hidden');
+                    animateElement(resultsScreen, 'fadeIn', 400);
+
+                }, 300);
+                
+                problemText.textContent = 'Результаты';
+                
+                const percentage = (score / totalQuestions);
+                const percentageText = Math.round(percentage * 100);
+                const didPass = percentage >= passThreshold;
+                
+                let totalAttempts = parseInt(localStorage.getItem('fsu_totalAttempts') || '0');
+                let successfulAttempts = parseInt(localStorage.getItem('fsu_successfulAttempts') || '0');
+                
+                totalAttempts++;
+                if (didPass) {
+                    successfulAttempts++;
+                }
+                
+                localStorage.setItem('fsu_totalAttempts', totalAttempts.toString());
+                localStorage.setItem('fsu_successfulAttempts', successfulAttempts.toString());
+
+                finalScore.textContent = `Ваш результат: ${score} / ${totalQuestions} (${percentageText}%)`;
+                
+                if (totalAttempts === 1) {
+                    totalAttemptsEl.textContent = `Всего попыток: 1 (Это ваша первая)`;
+                    successRateEl.textContent = `Успешность: ${didPass ? '100' : '0'}%`;
+                } else {
+                    totalAttemptsEl.textContent = `Всего попыток: ${totalAttempts}`;
+                    const successRate = totalAttempts > 0 ? Math.round((successfulAttempts / totalAttempts) * 100) : 0;
+                    successRateEl.textContent = `Успешность: ${successRate}%`;
+                }
+                
+                if (didPass) {
+                    resultsTitle.textContent = "Тест пройден!";
+                    resultsTitle.className = "text-3xl font-bold text-green-600 mb-4";
+                    resultsMessage.textContent = "Отличная работа!";
+                    restartBtn.textContent = "Пройти еще раз";
+                } else {
+                    resultsTitle.textContent = "Тест не пройден";
+                    resultsTitle.className = "text-3xl font-bold text-red-600 mb-4";
+                    resultsMessage.textContent = `Вам нужно набрать ${passThreshold * 100}% (${Math.ceil(totalQuestions * passThreshold)} правильных ответов) для прохождения.`;
+                    restartBtn.textContent = "Попробовать снова";
+                }
+            }
+            
+            function restartTest() {
+                score = 0;
+                questionNumber = 1;
+                
+                // Плавная замена
+                resultsScreen.style.transition = 'opacity 0.3s ease-out';
+                resultsScreen.style.opacity = '0';
+                
+                setTimeout(() => {
+                    resultsScreen.classList.add('hidden');
+                    quizContainer.classList.remove('hidden');
+                    quizContainer.style.opacity = '1'; // Убедимся, что он видим
+                    displayProblem();
+                }, 300);
+            }
+
+            async function selectAnswer(event) {
+                if (isRendering) return; 
+                
+                clearInterval(timerInterval); 
+                
+                const selectedButton = event.currentTarget;
+                const selectedAnswer = selectedButton.dataset.latex;
+                const isCorrect = (selectedAnswer === currentProblem.answer) || (currentProblem.altAnswer && selectedAnswer === currentProblem.altAnswer);
+
+                if (isCorrect) {
+                    score++;
+                    animateElement(feedback, 'popIn', 300);
+                    feedback.textContent = 'Правильно!';
+                    feedback.className = "text-center text-lg font-medium h-7 mb-3 text-green-600";
+                    selectedButton.classList.add('correct');
+                } else {
+                    animateElement(feedback, 'popIn', 300);
+                    feedback.textContent = 'Ошибка!';
+                    feedback.className = "text-center text-lg font-medium h-7 mb-3 text-red-600";
+                    selectedButton.classList.add('incorrect');
+                    
+                    Array.from(optionsContainer.children).forEach(button => {
+                        if (button.dataset.latex === currentProblem.answer || (currentProblem.altAnswer && button.dataset.latex === currentProblem.answer)) {
+                            button.classList.add('correct');
+                        }
+                    });
+                }
+
+                Array.from(optionsContainer.children).forEach(button => {
+                    button.disabled = true;
+                });
+                
+                scoreCounter.textContent = `Счет: ${score}`;
+                
+                // Плавное появление кнопки "Следующий"
+                animateElement(nextQuestionBtn, 'fadeIn', 300);
+            }
+
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            // --- Инициализация ---
+            
+            // Заполняем формулы в первый раз
+            hintGeneral.innerHTML = formulas.map(f => `<li>${f}</li>`).join('');
+            try {
+                // Рендерим статические формулы в подсказке
+                await MathJax.typesetPromise([hintGeneral]);
+            } catch (err) {
+                console.error("Ошибка MathJax при рендеринге шапки:", err);
+            }
+
+            restartBtn.addEventListener('click', restartTest);
+            showOptionsBtn.addEventListener('click', startTimer);
+            hintBtn.addEventListener('click', toggleHint);
+            
+            nextQuestionBtn.addEventListener('click', () => {
+                // Плавное исчезновение старого
+                animateElement(feedback, 'fadeOut', 200);
+                animateElement(optionsContainer, 'fadeOut', 200);
+                animateElement(timerContainer, 'fadeOut', 200);
+                animateElement(problemText, 'fadeOut', 200);
+                animateElement(nextQuestionBtn, 'fadeOut', 200, () => {
+                     // Запускаем новый вопрос ПОСЛЕ того, как все исчезло
+                    questionNumber++;
+                    displayProblem();
+                });
+            });
+
+            // Запускаем первый вопрос
+            await displayProblem();
+            
+        } // --- Конец функции myAppInit ---
+        
+    </script>
+
+</body>
+</html>
